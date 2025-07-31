@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统诊断</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .loading { background-color: #fff3cd; border-color: #ffeaa7; }
+    </style>
+</head>
+<body>
+    <h1>刷题系统诊断</h1>
+    
+    <div id="test1" class="test loading">
+        <h3>测试1: 基础连接</h3>
+        <div id="result1">测试中...</div>
+    </div>
+    
+    <div id="test2" class="test loading">
+        <h3>测试2: 健康检查API</h3>
+        <div id="result2">测试中...</div>
+    </div>
+    
+    <div id="test3" class="test loading">
+        <h3>测试3: 静态资源</h3>
+        <div id="result3">测试中...</div>
+    </div>
+    
+    <div id="test4" class="test loading">
+        <h3>测试4: 题目分类API</h3>
+        <div id="result4">测试中...</div>
+    </div>
+    
+    <script>
+        async function runTest(testId, testName, testFunc) {
+            const testDiv = document.getElementById(testId);
+            const resultDiv = document.getElementById(`result${testId.slice(-1)}`);
+            
+            try {
+                const result = await testFunc();
+                testDiv.className = 'test success';
+                resultDiv.innerHTML = `✅ ${testName}成功<br><pre>${JSON.stringify(result, null, 2)}</pre>`;
+            } catch (error) {
+                testDiv.className = 'test error';
+                resultDiv.innerHTML = `❌ ${testName}失败<br>错误: ${error.message}`;
+            }
+        }
+        
+        // 测试1: 基础连接
+        async function test1() {
+            const response = await fetch('/');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return { status: response.status, contentType: response.headers.get('content-type') };
+        }
+        
+        // 测试2: 健康检查
+        async function test2() {
+            const response = await fetch('/api/health');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        }
+        
+        // 测试3: 静态资源
+        async function test3() {
+            const response = await fetch('/app.js');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return { status: response.status, size: response.headers.get('content-length') };
+        }
+        
+        // 测试4: 题目分类API (需要登录，预期会失败)
+        async function test4() {
+            const response = await fetch('/api/questions/categories');
+            return { status: response.status, needsAuth: response.status === 401 };
+        }
+        
+        // 运行所有测试
+        window.onload = async function() {
+            await runTest('test1', '基础连接', test1);
+            await runTest('test2', '健康检查', test2);
+            await runTest('test3', '静态资源', test3);
+            await runTest('test4', '题目分类API', test4);
+        };
+    </script>
+</body>
+</html>

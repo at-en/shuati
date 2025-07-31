@@ -11,6 +11,14 @@ const AppState = {
 // API 基础URL
 const API_BASE = '/api';
 
+// HTML转义函数
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // 页面初始化
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthStatus();
@@ -343,9 +351,9 @@ function showQuestionPage() {
                         <span class="bg-primary text-white px-3 py-1 rounded-full text-sm font-medium">
                             ${getQuestionTypeText(question.type)}
                         </span>
-                        <span class="ml-3 text-gray-600 text-sm">${question.category}</span>
+                        <span class="ml-3 text-gray-600 text-sm">${escapeHtml(question.category)}</span>
                     </div>
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">${question.question}</h3>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">${escapeHtml(question.question)}</h3>
                     
                     <!-- 选项 -->
                     <div id="options-container">
@@ -380,36 +388,41 @@ function showQuestionPage() {
 
 // 渲染题目选项
 function renderQuestionOptions(question, options) {
-    if (question.type === 'judge') {
-        return `
-            <div class="space-y-3">
-                <label class="flex items-center space-x-3 cursor-pointer">
-                    <input type="radio" name="answer" value="正确" class="form-radio text-primary">
-                    <span>正确</span>
-                </label>
-                <label class="flex items-center space-x-3 cursor-pointer">
-                    <input type="radio" name="answer" value="错误" class="form-radio text-primary">
-                    <span>错误</span>
-                </label>
-            </div>
-        `;
-    } else if (options.length > 0) {
-        const inputType = question.type === 'multiple' ? 'checkbox' : 'radio';
-        return `
-            <div class="space-y-3">
-                ${options.map((option, index) => `
+    try {
+        if (question.type === 'judge') {
+            return `
+                <div class="space-y-3">
                     <label class="flex items-center space-x-3 cursor-pointer">
-                        <input type="${inputType}" name="answer" value="${option}" class="form-${inputType} text-primary">
-                        <span>${option}</span>
+                        <input type="radio" name="answer" value="正确" class="form-radio text-primary">
+                        <span>正确</span>
                     </label>
-                `).join('')}
-            </div>
-        `;
-    } else {
-        return `
-            <textarea name="answer" rows="4" placeholder="请输入答案..." 
-                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
-        `;
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="radio" name="answer" value="错误" class="form-radio text-primary">
+                        <span>错误</span>
+                    </label>
+                </div>
+            `;
+        } else if (options && options.length > 0) {
+            const inputType = question.type === 'multiple' ? 'checkbox' : 'radio';
+            return `
+                <div class="space-y-3">
+                    ${options.map((option, index) => `
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="${inputType}" name="answer" value="${escapeHtml(option)}" class="form-${inputType} text-primary">
+                            <span>${escapeHtml(option)}</span>
+                        </label>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            return `
+                <textarea name="answer" rows="4" placeholder="请输入答案..." 
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+            `;
+        }
+    } catch (error) {
+        console.error('Error rendering question options:', error);
+        return '<p class="text-red-500">选项加载失败</p>';
     }
 }
 
@@ -600,7 +613,7 @@ async function completeExam() {
 // 显示考试结果
 function showExamResult(result) {
     const contentArea = document.getElementById('content-area');
-    const accuracy = (result.correct_answers / result.total_questions * 100).toFixed(1);
+    const accuracy = result.total_questions > 0 ? (result.correct_answers / result.total_questions * 100).toFixed(1) : 0;
     const passed = result.score >= 60;
     
     contentArea.innerHTML = `
@@ -737,15 +750,15 @@ async function showStats() {
                     <!-- 总体统计 -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                         <div class="bg-blue-50 p-4 rounded-lg text-center">
-                            <div class="text-3xl font-bold text-blue-800">${data.total_answered}</div>
+                            <div class="text-3xl font-bold text-blue-800">${data.total_answered || 0}</div>
                             <div class="text-blue-600">已答题数</div>
                         </div>
                         <div class="bg-green-50 p-4 rounded-lg text-center">
-                            <div class="text-3xl font-bold text-green-800">${data.correct_count}</div>
+                            <div class="text-3xl font-bold text-green-800">${data.correct_count || 0}</div>
                             <div class="text-green-600">正确题数</div>
                         </div>
                         <div class="bg-yellow-50 p-4 rounded-lg text-center">
-                            <div class="text-3xl font-bold text-yellow-800">${data.accuracy.toFixed(1)}%</div>
+                            <div class="text-3xl font-bold text-yellow-800">${(data.accuracy || 0).toFixed(1)}%</div>
                             <div class="text-yellow-600">总体正确率</div>
                         </div>
                     </div>
@@ -754,7 +767,7 @@ async function showStats() {
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">分类统计</h3>
                         <div class="space-y-3">
-                            ${data.category_stats.map(stat => `
+                            ${data.category_stats && data.category_stats.length > 0 ? data.category_stats.map(stat => `
                                 <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                                     <div>
                                         <span class="font-medium text-gray-900">${stat.category}</span>
@@ -762,12 +775,12 @@ async function showStats() {
                                     </div>
                                     <div class="flex items-center space-x-3">
                                         <div class="w-32 bg-gray-200 rounded-full h-2">
-                                            <div class="bg-primary h-2 rounded-full" style="width: ${stat.accuracy}%"></div>
+                                            <div class="bg-primary h-2 rounded-full" style="width: ${stat.accuracy || 0}%"></div>
                                         </div>
-                                        <span class="text-sm font-medium text-gray-900 w-12">${stat.accuracy.toFixed(1)}%</span>
+                                        <span class="text-sm font-medium text-gray-900 w-12">${(stat.accuracy || 0).toFixed(1)}%</span>
                                     </div>
                                 </div>
-                            `).join('')}
+                            `).join('') : '<p class="text-gray-500 text-center py-4">暂无统计数据</p>'}
                         </div>
                     </div>
                     

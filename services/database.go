@@ -66,7 +66,11 @@ func InitDatabase() error {
 		if err := importQuestionsFromJSON(); err != nil {
 			return fmt.Errorf("failed to import questions: %v", err)
 		}
+		// 重新计算导入后的题目数量
+		DB.Model(&models.Question{}).Count(&count)
 		log.Printf("Successfully imported %d questions", count)
+	} else {
+		log.Printf("Database already contains %d questions", count)
 	}
 	
 	log.Println("Database initialized successfully")
@@ -124,11 +128,15 @@ func importQuestionsFromJSON() error {
 		return fmt.Errorf("failed to read questions.json: %v", err)
 	}
 	
+	log.Printf("Read questions.json file, size: %d bytes", len(data))
+	
 	// 解析JSON数据
 	var questionFile QuestionFile
 	if err := json.Unmarshal(data, &questionFile); err != nil {
 		return fmt.Errorf("failed to parse questions.json: %v", err)
 	}
+	
+	log.Printf("Parsed question file: %s, total questions: %d", questionFile.Title, len(questionFile.Questions))
 	
 	// 批量插入数据
 	batchSize := 100
