@@ -33,6 +33,9 @@ func main() {
 		log.Printf("Warning: Failed to preload questions to cache: %v", err)
 	}
 
+	// 初始化学习进度服务
+	handlers.InitLearningProgressService()
+
 	// 设置Gin模式
 	gin.SetMode(gin.ReleaseMode)
 
@@ -88,6 +91,19 @@ func main() {
 				user.GET("/stats", handlers.GetUserStatsHandler)
 			}
 
+			// 学习进度相关路由
+			progress := authenticated.Group("/progress")
+			{
+				progress.GET("/dashboard", handlers.GetLearningDashboard)
+				progress.GET("/summary", handlers.GetProgressSummary)
+				progress.GET("/categories", handlers.GetCategoryProgress)
+				progress.GET("/sessions", handlers.GetStudySessions)
+				progress.GET("/insights", handlers.GetLearningInsights)
+				progress.PUT("/insights/:insightId/read", handlers.MarkInsightAsRead)
+				progress.GET("/weekly", handlers.GetWeeklyStats)
+				progress.GET("/daily", handlers.GetDailyStats)
+			}
+
 			// 题目相关路由
 			questions := authenticated.Group("/questions")
 			{
@@ -107,6 +123,13 @@ func main() {
 				exam.POST("/:sessionId/answer", handlers.SubmitExamAnswer)
 				exam.POST("/:sessionId/complete", handlers.CompleteExam)
 				exam.GET("/history", handlers.GetExamHistory)
+				
+				// 答题卡相关路由
+				exam.GET("/:examId/answer-sheet", handlers.GetAnswerSheet)
+				exam.PUT("/:examId/answer-sheet/question/:questionNum", handlers.UpdateQuestionStatus)
+				exam.POST("/:examId/answer-sheet/question/:questionNum/mark", handlers.ToggleQuestionMark)
+				exam.GET("/:examId/answer-sheet/stats", handlers.GetAnswerSheetStats)
+				exam.GET("/:examId/answer-sheet/question/:questionNum", handlers.JumpToQuestion)
 			}
 		}
 

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>答案修复验证</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .result { margin-top: 10px; padding: 10px; background-color: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <h1>答案比较修复验证工具</h1>
+    
+    <div class="test info">
+        <h3>测试说明</h3>
+        <p>此工具用于验证答案比较逻辑的修复是否成功。</p>
+        <p>请确保系统已重新编译并重启。</p>
+    </div>
+    
+    <div class="test">
+        <h3>步骤1: 登录系统</h3>
+        <button onclick="testLogin()">测试登录</button>
+        <div id="loginResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="test">
+        <h3>步骤2: 获取测试题目</h3>
+        <button onclick="getTestQuestion()">获取题目</button>
+        <div id="questionResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="test">
+        <h3>步骤3: 测试答案提交</h3>
+        <button onclick="testAnswerSubmission()">测试正确答案</button>
+        <button onclick="testWrongAnswer()">测试错误答案</button>
+        <div id="answerResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <div class="test">
+        <h3>步骤4: 验证结果</h3>
+        <div id="finalResult" class="result" style="display:none;"></div>
+    </div>
+    
+    <script>
+        let testQuestion = null;
+        let sessionCookie = null;
+        
+        async function testLogin() {
+            const resultDiv = document.getElementById('loginResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                // 尝试注册测试用户
+                const registerResponse = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'testuser_fix', password: 'test123' }),
+                    credentials: 'include'
+                });
+                
+                // 登录测试用户
+                const loginResponse = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'testuser_fix', password: 'test123' }),
+                    credentials: 'include'
+                });
+                
+                if (loginResponse.ok) {
+                    const data = await loginResponse.json();
+                    resultDiv.innerHTML = `✅ 登录成功: ${data.user.username}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    throw new Error('登录失败');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 登录失败: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function getTestQuestion() {
+            const resultDiv = document.getElementById('questionResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                const response = await fetch('/api/questions?limit=1', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.questions && data.questions.length > 0) {
+                        testQuestion = data.questions[0];
+                        const options = testQuestion.options ? testQuestion.options.split('|') : [];
+                        
+                        resultDiv.innerHTML = `
+                            ✅ 获取题目成功<br>
+                            <strong>题目:</strong> ${testQuestion.question}<br>
+                            <strong>类型:</strong> ${testQuestion.type}<br>
+                            <strong>正确答案:</strong> ${testQuestion.answer}<br>
+                            <strong>选项:</strong><br>
+                            ${options.map(opt => `- ${opt}`).join('<br>')}
+                        `;
+                        resultDiv.className = 'result success';
+                    } else {
+                        throw new Error('没有获取到题目');
+                    }
+                } else {
+                    throw new Error('获取题目失败');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 获取题目失败: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testAnswerSubmission() {
+            if (!testQuestion) {
+                alert('请先获取测试题目');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('answerResult');
+            resultDiv.style.display = 'block';
+            
+            try {
+                // 构造正确答案（完整格式）
+                const options = testQuestion.options ? testQuestion.options.split('|') : [];
+                let correctAnswerFull = testQuestion.answer;
+                
+                // 如果有选项，找到对应的完整选项
+                if (options.length > 0) {
+                    const correctOption = options.find(opt => opt.startsWith(testQuestion.answer + '.'));
+                    if (correctOption) {
+                        correctAnswerFull = correctOption;
+                    }
+                }
+                
+                const response = await fetch('/api/questions/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question_id: testQuestion.id,
+                        answer: correctAnswerFull
+                    }),
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const status = data.is_correct ? '✅ 正确' : '❌ 错误';
+                    
+                    resultDiv.innerHTML = `
+                        ${status} 答案提交测试结果<br>
+                        <strong>提交的答案:</strong> ${correctAnswerFull}<br>
+                        <strong>正确答案:</strong> ${data.correct_answer}<br>
+                        <strong>判断结果:</strong> ${data.is_correct ? '正确' : '错误'}<br>
+                        <strong>修复状态:</strong> ${data.is_correct ? '✅ 修复成功' : '❌ 仍有问题'}
+                    `;
+                    resultDiv.className = data.is_correct ? 'result success' : 'result error';
+                    
+                    // 更新最终结果
+                    updateFinalResult(data.is_correct);
+                } else {
+                    throw new Error('提交答案失败');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 测试失败: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+        
+        async function testWrongAnswer() {
+            if (!testQuestion) {
+                alert('请先获取测试题目');
+                return;
+            }
+            
+            try {
+                // 提交一个错误答案
+                const wrongAnswer = testQuestion.answer === 'A' ? 'B. 错误选项' : 'A. 错误选项';
+                
+                const response = await fetch('/api/questions/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question_id: testQuestion.id,
+                        answer: wrongAnswer
+                    }),
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('错误答案测试:', data.is_correct ? '应该是错误但显示正确' : '正确显示为错误');
+                }
+            } catch (error) {
+                console.error('错误答案测试失败:', error);
+            }
+        }
+        
+        function updateFinalResult(isFixed) {
+            const resultDiv = document.getElementById('finalResult');
+            resultDiv.style.display = 'block';
+            
+            if (isFixed) {
+                resultDiv.innerHTML = `
+                    🎉 <strong>修复验证成功！</strong><br>
+                    答案比较逻辑已正确修复，系统现在能够正确处理完整格式的选项答案。
+                `;
+                resultDiv.className = 'result success';
+            } else {
+                resultDiv.innerHTML = `
+                    ⚠️ <strong>修复验证失败</strong><br>
+                    答案比较逻辑仍有问题，请检查代码修改是否正确应用，并确保系统已重新编译和重启。
+                `;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html>
